@@ -1,12 +1,17 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 import { Category, Product, ShopInfo } from './types';
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 const SHOP_INFO_KEY = 'shop:info';
 const CATEGORIES_KEY = 'categories';
 const PRODUCTS_KEY = 'products';
 
 export async function getShopInfo(): Promise<ShopInfo> {
-  const info = await kv.get<ShopInfo>(SHOP_INFO_KEY);
+  const info = await redis.get<ShopInfo>(SHOP_INFO_KEY);
   if (!info) {
     return {
       name: 'JuttiDot com',
@@ -21,7 +26,7 @@ export async function getShopInfo(): Promise<ShopInfo> {
 }
 
 export async function getCategories(): Promise<Category[]> {
-  const categories = await kv.get<Category[]>(CATEGORIES_KEY);
+  const categories = await redis.get<Category[]>(CATEGORIES_KEY);
   return categories || [];
 }
 
@@ -38,7 +43,7 @@ export async function addCategory(name: string): Promise<Category> {
     slug: name.toLowerCase().replace(/\s+/g, '-'),
   };
   categories.push(category);
-  await kv.set(CATEGORIES_KEY, categories);
+  await redis.set(CATEGORIES_KEY, categories);
   return category;
 }
 
@@ -47,22 +52,22 @@ export async function updateCategory(id: string, name: string): Promise<void> {
   const index = categories.findIndex(c => c.id === id);
   if (index !== -1) {
     categories[index] = { ...categories[index], name, slug: name.toLowerCase().replace(/\s+/g, '-') };
-    await kv.set(CATEGORIES_KEY, categories);
+    await redis.set(CATEGORIES_KEY, categories);
   }
 }
 
 export async function deleteCategory(id: string): Promise<void> {
   const categories = await getCategories();
   const filtered = categories.filter(c => c.id !== id);
-  await kv.set(CATEGORIES_KEY, filtered);
+  await redis.set(CATEGORIES_KEY, filtered);
   
   const products = await getProducts();
   const filteredProducts = products.filter(p => p.categoryId !== id);
-  await kv.set(PRODUCTS_KEY, filteredProducts);
+  await redis.set(PRODUCTS_KEY, filteredProducts);
 }
 
 export async function getProducts(): Promise<Product[]> {
-  const products = await kv.get<Product[]>(PRODUCTS_KEY);
+  const products = await redis.get<Product[]>(PRODUCTS_KEY);
   return products || [];
 }
 
@@ -83,7 +88,7 @@ export async function addProduct(product: Omit<Product, 'id'>): Promise<Product>
     id: Date.now().toString(),
   };
   products.push(newProduct);
-  await kv.set(PRODUCTS_KEY, products);
+  await redis.set(PRODUCTS_KEY, products);
   return newProduct;
 }
 
@@ -92,14 +97,14 @@ export async function updateProduct(id: string, product: Partial<Product>): Prom
   const index = products.findIndex(p => p.id === id);
   if (index !== -1) {
     products[index] = { ...products[index], ...product };
-    await kv.set(PRODUCTS_KEY, products);
+    await redis.set(PRODUCTS_KEY, products);
   }
 }
 
 export async function deleteProduct(id: string): Promise<void> {
   const products = await getProducts();
   const filtered = products.filter(p => p.id !== id);
-  await kv.set(PRODUCTS_KEY, filtered);
+  await redis.set(PRODUCTS_KEY, filtered);
 }
 
 export async function seedInitialData(): Promise<void> {
@@ -149,7 +154,7 @@ export async function seedInitialData(): Promise<void> {
       },
     ];
 
-    await kv.set(CATEGORIES_KEY, categories);
-    await kv.set(PRODUCTS_KEY, products);
+    await redis.set(CATEGORIES_KEY, categories);
+    await redis.set(PRODUCTS_KEY, products);
   }
 }
